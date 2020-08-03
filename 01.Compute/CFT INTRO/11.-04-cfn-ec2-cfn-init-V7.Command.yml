@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+ 
+  MyKeyName:
+    Description: Select you keypair
+    Type: 'AWS::EC2::KeyPair::KeyName'
+
+Resources:
+
+  EC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Metadata:
+      Comment: Deploy a simple tomcat application
+      'AWS::CloudFormation::Init':
+        config:
+          packages:
+            yum:
+              java-1.8.0-openjdk.x86_64: []
+              jdva-1.8.0-openjdk-devel: []
+              tomcat8: []
+          groups:
+            prodgroup: {}
+            devgroup:
+              gid: "5001"
+          users:
+            user1:
+              groups:
+                - prodgroup
+                - devgroup
+              uid: "1001"
+              homeDir: "/opt"
+          sources:
+            /opt: "https://codedeploybucketetechbrain.s3.ap-south-1.amazonaws.com/cfn/SampleWebApp.zip"
+          files:
+            "/etc/cfn/cfn-hub.conf":
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+                interval=7
+              mode: "000400"
+              owner: "root"
+              group: "root"
+            "/etc/cfn/hooks.d/cfn-auto-reloader.conf"
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.EC2Instance.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2Instance --region ${AWS::Region}
+              mode: "000400"
+              owner: "root"
+              group: "root"
+          commands:
+            test1:
+              command: "chmod 755 SampleWebApp.war"
+              cwd: "/opt"
+            test2:
+              command: "sudo yum -y erase java-1.7.0-openjdk.x86_64"
+              cwd: "~"
+            test3:
+              command: "rm -rf SampleWebApp*"
+              cwd: "/var/lib/tomcat8/webapps"
+            test4:
+              command: "cp SampleWebApp.war /var/lib/tomcat8/webapps"
+              cwd: "/opt"
+          services:
+            sysvinit:
+              tomcat8:
+                enabe: "true"
+                ensureRunning: "true"
+    Properties:
+      ImageId: ami-02913db388613c3e1
+      InstanceType: t2.micro
+      KeyName: !Ref MyKeyName
+      SecurityGroups: 
+        - !Ref DevInstanceSecurityGroup
+          
+  DevInstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allow SSH to client host DEV SG
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+          
+Outputs:
+
+  MyInstanceID:
+    Description: My Instance ID
+    Value: !Ref EC2Instance

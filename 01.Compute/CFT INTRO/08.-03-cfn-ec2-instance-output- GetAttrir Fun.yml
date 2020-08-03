@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+
+  MyKeyName:
+    Description: Select you keypair
+    Type: AWS::EC2::KeyPair::KeyName
+        
+  EnvironmentName:
+    Description: Select the Environment
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - uat
+      - prod
+
+Mappings:
+
+  MyRegionMap:
+    us-east-1:
+      HVM64: ami-0b69ea66ff7391e80
+    us-east-2:
+      HVM64: ami-00c03f7f7f2ec15c3
+    ap-south-1:
+      HVM64: ami-0cb0e70f44e1a4bb5
+
+  MyEnvironmentMap:
+    dev:
+      instanceType: t2.micro
+    uat:
+      instanceType: t2.small
+    prod:
+      instanceType: t2.medium
+
+Resources:
+
+  EC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !FindInMap
+        - MyRegionMap
+        - !Ref 'AWS::Region'
+        - HVM64 
+      InstanceType: !FindInMap
+        - MyEnvironmentMap
+        - !Ref EnvironmentName
+        - instanceType
+      KeyName: !Ref MyKeyName
+      SecurityGroups: 
+        - !Ref DevInstanceSecurityGroup
+
+  DevInstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allow SSH to client host DEV SG
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+  
+Outputs:
+  MyInstanceID:
+    Description: My Instance ID
+    Value: !Ref EC2Instance
+  
+  MyInstanceAvailabilityZone:
+    Description: My Instance AZ
+    Value: !GetAtt EC2Instance.AvailabilityZone
+
+  MyInstancePublicDNS:
+    Description: My Instance MyInstancePublicDNS
+    Value: !GetAtt EC2Instance.PublicDnsName
+  
+  MyInstancePrivateDNS:
+    Description: My Instance MyInstancePrivateDNS
+    Value: !GetAtt EC2Instance.PrivateDnsName

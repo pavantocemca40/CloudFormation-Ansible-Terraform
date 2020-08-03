@@ -1,0 +1,390 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: |
+  This CloudFormation script provisions a S3,CodeCommit,CodeBuild,ECR project .
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+  
+Parameters:
+
+  S3BucketName:
+    Description: Give a S3 Bucket Unique name, No CAPS Letters 
+    Type: String
+    Default: etechbrain-dev-ecr
+    
+  CodeCommitRepoName:
+    Type: String
+    Description: Repository Name to Create
+    Default: python-addemp
+
+  ECRRepositoryName:
+    Description: ECR repository name
+    Default: python-addemp
+    Type: String
+    
+  CodeBuildProjectName:
+    Type: String
+    Description: Code Build Project Name
+    Default: python-addemp
+
+Resources:
+
+    ####################
+    # Code Build Role  #
+    ####################
+    
+  CodeBuildRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName:
+        Fn::Sub: CodeBuildRole${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /service-role/
+      Policies:
+        - PolicyName: "CodeBuildAccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "codecommit:GitPull"
+                Resource:
+                  - Fn::Sub: arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CodeCommitRepoName}
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreatelogStream"
+                  - "logs:PutLogEvents"
+                Resource:
+                  - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
+              - Effect: Allow
+                Action:
+                  - 'ecr:*'
+                  - 'cloudtrail:LookupEvents'
+                Resource: '*'
+              - Effect: Allow
+                Action: 
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:PutObject'
+                Resource: !Sub 'arn:aws:s3:::${S3BucketName}/*'
+              - Action:
+                  - 'autoscaling:Describe*'
+                  - 'cloudwatch:*'
+                  - 'logs:*'
+                  - 'sns:*'
+                  - 'iam:GetPolicy'
+                  - 'iam:GetPolicyVersion'
+                  - 'iam:GetRole'
+                Effect: Allow
+                Resource: '*'
+              - Effect: Allow
+                Action: 'iam:CreateServiceLinkedRole'
+                Resource: >-
+                  arn:aws:iam::*:role/aws-service-role/events.amazonaws.com/AWSServiceRoleForCloudWatchEvents*
+                Condition:
+                  StringLike:
+                    'iam:AWSServiceName': events.amazonaws.com
+
+    #######################
+    # Code Pipeline Role  #
+    #######################
+    
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 's3:*'
+                Resource: '*'
+              - Action:
+                  - 'iam:PassRole'
+                Resource: '*'
+                Effect: Allow
+                Condition:
+                  StringEqualsIfExists:
+                    'iam:PassedToService':
+                      - cloudformation.amazonaws.com
+                      - elasticbeanstalk.amazonaws.com
+                      - ec2.amazonaws.com
+                      - ecs-tasks.amazonaws.com
+              - Action:
+                  - 'codecommit:CancelUploadArchive'
+                  - 'codecommit:GetBranch'
+                  - 'codecommit:GetCommit'
+                  - 'codecommit:GetUploadArchiveStatus'
+                  - 'codecommit:UploadArchive'
+                Resource: '*'
+                Effect: Allow
+              - Action:
+                  - 'codedeploy:CreateDeployment'
+                  - 'codedeploy:GetApplication'
+                  - 'codedeploy:GetApplicationRevision'
+                  - 'codedeploy:GetDeployment'
+                  - 'codedeploy:GetDeploymentConfig'
+                  - 'codedeploy:RegisterApplicationRevision'
+                Resource: '*'
+                Effect: Allow
+              - Action:
+                  - 'elasticbeanstalk:*'
+                  - 'ec2:*'
+                  - 'elasticloadbalancing:*'
+                  - 'autoscaling:*'
+                  - 'cloudwatch:*'
+                  - 's3:*'
+                  - 'sns:*'
+                  - 'cloudformation:*'
+                  - 'rds:*'
+                  - 'sqs:*'
+                  - 'ecs:*'
+                Resource: '*'
+                Effect: Allow
+              - Action:
+                  - 'lambda:InvokeFunction'
+                  - 'lambda:ListFunctions'
+                Resource: '*'
+                Effect: Allow
+              - Action:
+                  - 'opsworks:CreateDeployment'
+                  - 'opsworks:DescribeApps'
+                  - 'opsworks:DescribeCommands'
+                  - 'opsworks:DescribeDeployments'
+                  - 'opsworks:DescribeInstances'
+                  - 'opsworks:DescribeStacks'
+                  - 'opsworks:UpdateApp'
+                  - 'opsworks:UpdateStack'
+                Resource: '*'
+                Effect: Allow
+              - Action:
+                  - 'cloudformation:CreateStack'
+                  - 'cloudformation:DeleteStack'
+                  - 'cloudformation:DescribeStacks'
+                  - 'cloudformation:UpdateStack'
+                  - 'cloudformation:CreateChangeSet'
+                  - 'cloudformation:DeleteChangeSet'
+                  - 'cloudformation:DescribeChangeSet'
+                  - 'cloudformation:ExecuteChangeSet'
+                  - 'cloudformation:SetStackPolicy'
+                  - 'cloudformation:ValidateTemplate'
+                Resource: '*'
+                Effect: Allow
+              - Action:
+                  - 'codebuild:BatchGetBuilds'
+                  - 'codebuild:StartBuild'
+                Resource: '*'
+                Effect: Allow
+              - Effect: Allow
+                Action:
+                  - 'devicefarm:ListProjects'
+                  - 'devicefarm:ListDevicePools'
+                  - 'devicefarm:GetRun'
+                  - 'devicefarm:GetUpload'
+                  - 'devicefarm:CreateUpload'
+                  - 'devicefarm:ScheduleRun'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'servicecatalog:ListProvisioningArtifacts'
+                  - 'servicecatalog:CreateProvisioningArtifact'
+                  - 'servicecatalog:DescribeProvisioningArtifact'
+                  - 'servicecatalog:DeleteProvisioningArtifact'
+                  - 'servicecatalog:UpdateProduct'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                 - 'cloudformation:ValidateTemplate'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'ecr:DescribeImages'
+                Resource: '*'
+              - Action:
+                  - 'codebuild:*'
+                  - 'codecommit:GetBranch'
+                  - 'codecommit:GetCommit'
+                  - 'codecommit:GetRepository'
+                  - 'codecommit:ListBranches'
+                  - 'codecommit:ListRepositories'
+                  - 'cloudwatch:GetMetricStatistics'
+                  - 'ec2:DescribeVpcs'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:DescribeSubnets'
+                  - 'ecr:DescribeRepositories'
+                  - 'ecr:ListImages'
+                  - 'events:DeleteRule'
+                  - 'events:DescribeRule'
+                  - 'events:DisableRule'
+                  - 'events:EnableRule'
+                  - 'events:ListTargetsByRule'
+                  - 'events:ListRuleNamesByTarget'
+                  - 'events:PutRule'
+                  - 'events:PutTargets'
+                  - 'events:RemoveTargets'
+                  - 'logs:GetLogEvents'
+                  - 's3:GetBucketLocation'
+                  - 's3:ListAllMyBuckets'
+                Effect: Allow
+                Resource: '*'
+              - Action:
+                  - 'logs:DeleteLogGroup'
+                Effect: Allow
+                Resource: 'arn:aws:logs:*:*:log-group:/aws/codebuild/*:log-stream:*'
+              - Effect: Allow
+                Action:
+                  - 'ssm:PutParameter'
+                Resource: 'arn:aws:ssm:*:*:parameter/CodeBuild/*'
+
+
+    ###########################
+    #       S3 Bucket         #
+    ###########################
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Ref S3BucketName
+      
+    ###########################
+    # Code Commit Repository  #
+    ###########################
+
+  CodeCommitRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref CodeCommitRepoName
+      RepositoryDescription: New Repository Creation
+
+    ###########################
+    #     ECR Repository      #
+    ###########################
+    
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ECRRepositoryName
+      Tags: 
+        - Key: ECR
+          Value: !Sub ECRRepositoryName
+
+    ###########################
+    # Code Build project      #
+    ###########################
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref CodeBuildProjectName
+      Description: Sample python ECS Demo
+      ServiceRole: !GetAtt [CodeBuildRole, Arn]
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:1.0
+        PrivilegedMode: true
+      Source:
+        Location: !Sub https://git-codecommit.${AWS::Region}.amazonaws.com/v1/repos/${CodeCommitRepoName}
+        Type: CODECOMMIT
+      SourceVersion: 'refs/heads/master'
+      TimeoutInMinutes: 15
+      BadgeEnabled: false
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Sub "Build-${AWS::StackName}"
+          Status: ENABLED
+      Tags:
+        - Key: Name
+          Value: !Sub Build-${AWS::StackName}
+
+    ###########################
+    # Code Pipeline project   #
+    ###########################
+    
+  Pipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name: !Ref CodeBuildProjectName
+      RoleArn:
+          Fn::GetAtt: [ CodePipelineRole, Arn ]
+      ArtifactStore:
+        Type: S3
+        Location: !Ref S3Bucket
+      Stages:
+        -
+          Name: CodeCommit
+          Actions:
+            -
+              Name: CodeCommit
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              Configuration:
+                BranchName: master
+                RepositoryName:
+                  Ref: CodeCommitRepoName                
+              OutputArtifacts:
+                - Name: SourceZip
+              RunOrder: 1
+        -
+          Name: CodeBuild
+          Actions:
+            -
+              Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild 
+              Configuration:
+                ProjectName:
+                  Ref: CodeBuildProject                
+              InputArtifacts:
+                - Name: SourceZip
+              OutputArtifacts:
+                - Name: BuildZip
+              RunOrder: 1
+ 
+Outputs:
+
+  MyECRRepository:
+    Description: CodeCommit repository
+    Value: !Ref ECRRepository
+    
+  MyECRRepositoryArn:
+    Description: Get the ECRRepository ARN
+    Value: !GetAtt  ECRRepository.Arn
+    
+  MyCodeCommitRepository:
+    Description: CodeCommit repository
+    Value: !Ref CodeCommitRepository
+    
+  MyCodecommitRepositoryArn:
+    Description: Get the ECRRepository ARN
+    Value: !GetAtt  CodeCommitRepository.Arn
+    
+  MyCodecommitRepositoryURL:
+    Description: Get the ECRRepository URL
+    Value: !GetAtt  CodeCommitRepository.CloneUrlHttp

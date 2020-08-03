@@ -1,0 +1,209 @@
+AWSTemplateFormatVersion: 2010-09-09
+####################################################################################
+Description: |
+  This CloudFormation script provisions a EC2 Instance AMI Creation & Deletion Based on Retation day(7).
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+####################################################################################
+Parameters:
+####################################################################################
+
+  S3BucketName:
+    Type: String
+    Default: 'etechbrain-dev-web' 
+    
+  AMICreateFunctionName:
+    Type: String
+    Default: 'AMI-CREATE-EC2-INSTANCE-DEV' 
+
+  AMIDeleteFunctionName:
+    Type: String
+    Default: 'AMI-DELETE-EC2-INSTANCE-DEV' 
+####################################################################################
+Resources:
+####################################################################################
+
+  AMIRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: LambdaRoleinstanceAMI
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: AWSLambdaBasicExecutionRole
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+        - PolicyName: CloudwatchFullAccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'autoscaling:Describe*'
+                  - 'cloudwatch:*'
+                  - 'logs:*'
+                  - 'sns:*'
+                  - 'iam:GetPolicy'
+                  - 'iam:GetPolicyVersion'
+                  - 'iam:GetRole'
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: AmazonS3FullAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 's3:*'
+                Resource:
+                  - 'arn:aws:s3:::{S3BucketName}'
+                  - 'arn:aws:s3:::{S3BucketName}/*'
+        - PolicyName: InstanceAccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action: 'ec2:*'
+                Effect: Allow
+                Resource: '*'
+              - Effect: Allow
+                Action: 'elasticloadbalancing:*'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'cloudwatch:*'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'autoscaling:*'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'iam:CreateServiceLinkedRole'
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'iam:AWSServiceName':
+                      - autoscaling.amazonaws.com
+                      - ec2scheduled.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
+                      - spot.amazonaws.com
+                      - spotfleet.amazonaws.com
+                      - transitgateway.amazonaws.com
+                      
+  RegisterInstanceAMI:
+    Type: 'AWS::Lambda::Function'
+    DependsOn:
+      - AMIRole    
+    Properties:
+      FunctionName: !Ref AMICreateFunctionName
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt 
+        - AMIRole
+        - Arn
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: lambda/ec2-ami-create.zip
+      Runtime: python2.7
+      MemorySize: 256
+      Timeout: 600
+      Description: EC2 Instance AMI Will take daily based on Instance Tag
+
+  AMICreateSchedule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: !Ref AMICreateFunctionName
+      Description: AMI will create a 05:00 GMT
+      ScheduleExpression: "cron(00 05 * * ? *)"
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "RegisterInstanceAMI"
+              - "Arn"
+          Id: !Ref AMICreateFunctionName
+      State: ENABLED
+
+  AMICreateScheduleInvokeLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName:
+        Ref: RegisterInstanceAMI
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        'Fn::GetAtt':
+          - AMICreateSchedule
+          - Arn
+
+  DeregisterInstanceAMI:
+    Type: 'AWS::Lambda::Function'
+    DependsOn:
+      - AMIRole    
+    Properties:
+      FunctionName: !Ref AMIDeleteFunctionName
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt 
+        - AMIRole
+        - Arn
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: lambda/ec2-ami-delete.zip
+      Runtime: python2.7
+      MemorySize: 256
+      Timeout: 600
+      Description: EC2 Instance AMI Will delete daily based on Instance Tag with Retation day
+
+  AMIDeleteSchedule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: !Ref AMIDeleteFunctionName
+      Description: AMI will delete a 05:30 GMT Based on Retation day with Tag Name
+      ScheduleExpression: "cron(30 05 * * ? *)"
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "DeregisterInstanceAMI"
+              - "Arn"
+          Id: !Ref AMICreateFunctionName
+      State: ENABLED
+
+  AMICreateScheduleInvokeLambdaPermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      FunctionName:
+        Ref: DeregisterInstanceAMI
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceArn:
+        'Fn::GetAtt':
+          - AMIDeleteSchedule
+          - Arn
+####################################################################################
+Outputs:
+####################################################################################
+
+  LambdaRegisterAMI:
+    Description: Get the Lambda Function for RegisterAMI
+    Value: !Ref RegisterInstanceAMI
+
+  CloudWatchAMICreateSchedule:
+    Description: Get the Cloudwatch info 
+    Value: !Ref AMICreateSchedule
+    
+  LambdaDeregisterAMI:
+    Description: Get the Lambda Function for DeregisterAMI
+    Value: !Ref DeregisterInstanceAMI
+      
+  CloudWatchAMIDeleteSchedule:
+    Description: Get the Cloudwatch info 
+    Value: !Ref AMIDeleteSchedule

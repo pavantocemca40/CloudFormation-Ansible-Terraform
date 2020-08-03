@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+
+  ECRRepositoryName:
+    Description: ECR repository name
+    Default: addempp
+    Type: String
+
+Resources:
+
+  MyRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ECRRepositoryName
+      Tags: 
+        - Key: Reponame
+          Value: !Sub ECRRepositoryName
+          
+Outputs:
+
+  MyRepositoryName:
+    Description: A reference to the created VPC
+    Value: !Ref MyRepository
+    
+  MyRepositoryArn:
+    Description: Get the Repo ARN
+    Value: !GetAtt  MyRepository.Arn
+  
+    

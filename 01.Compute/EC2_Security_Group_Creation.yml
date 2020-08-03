@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Create EC2 Security Group
+
+Parameters:
+
+  IpProtocol:
+    Description: Protocol type
+    Type: String
+    Default: tcp
+    AllowedValues:
+      - tcp
+      - udp
+      
+  PortNo: 
+    Description: Give the Port No.
+    Type: String
+    Default: '22'
+  
+  CidrIP:
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: CIDR IP. 
+
+  VPCID:
+    Description: Give the VPC ID
+    Type: String
+    Default: 'vpc-0da84b8dee682c001'
+    
+Resources:
+
+  InstanceSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Allow Ruled Protocol
+      SecurityGroupIngress:
+        - IpProtocol: !Ref IpProtocol
+          FromPort: !Ref PortNo
+          ToPort: !Ref PortNo
+          CidrIp: !Ref CidrIP
+      VpcId: !Ref VPCID
+Outputs:
+
+  DBInstanceIdentifier:
+    Description: The SecurityGroup identifier
+    Value: !Ref InstanceSecurityGroup

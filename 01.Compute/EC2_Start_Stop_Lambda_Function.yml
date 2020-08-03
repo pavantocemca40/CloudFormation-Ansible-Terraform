@@ -1,0 +1,181 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  This CloudFormation script provisions a EC2 Instance START & STOP Based on Cloudwath Rule Time.
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+
+Parameters:
+
+  S3BucketName:
+    Type: String
+    Default: 'etechbrain-dev-web' 
+    
+  EC2StartFunctionName:
+    Type: String
+    Default: 'EC2-START-INSTANCE-DEV' 
+
+  EC2StopFunctionName:
+    Type: String
+    Default: 'EC2-STOP-INSTANCE-DEV' 
+    
+Resources:
+
+  MyRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: LambdaRoleinstance
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: AWSLambdaBasicExecutionRole
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: '*'
+        - PolicyName: CloudwatchFullAccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'autoscaling:Describe*'
+                  - 'cloudwatch:*'
+                  - 'logs:*'
+                  - 'sns:*'
+                  - 'iam:GetPolicy'
+                  - 'iam:GetPolicyVersion'
+                  - 'iam:GetRole'
+                Effect: Allow
+                Resource: '*'
+        - PolicyName: AmazonS3FullAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 's3:*'
+                Resource:
+                  - 'arn:aws:s3:::{S3BucketName}'
+                  - 'arn:aws:s3:::{S3BucketName}/*'
+        - PolicyName: InstanceAccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action: 'ec2:*'
+                Effect: Allow
+                Resource: '*'
+              - Effect: Allow
+                Action: 'elasticloadbalancing:*'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'cloudwatch:*'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'autoscaling:*'
+                Resource: '*'
+              - Effect: Allow
+                Action: 'iam:CreateServiceLinkedRole'
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    'iam:AWSServiceName':
+                      - autoscaling.amazonaws.com
+                      - ec2scheduled.amazonaws.com
+                      - elasticloadbalancing.amazonaws.com
+                      - spot.amazonaws.com
+                      - spotfleet.amazonaws.com
+                      - transitgateway.amazonaws.com
+                      
+  EC2InstanceStart:
+    Type: 'AWS::Lambda::Function'
+    DependsOn:
+      - MyRole    
+    Properties:
+      FunctionName: !Ref EC2StartFunctionName
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt 
+        - MyRole
+        - Arn
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: lambda/ec2-start.zip
+      Runtime: python2.7
+      MemorySize: 256
+      Timeout: 600
+      Description: EC2 Instance Start Will take daily based on Instance Tag with Schedule
+
+  EC2StartSchedule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: !Ref EC2StartFunctionName
+      Description: EC2 Instance Will start at 05:00 GMT Everyday
+      ScheduleExpression: "cron(00 05 * * ? *)"
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "EC2InstanceStart"
+              - "Arn"
+          Id: !Ref EC2StartFunctionName
+      State: ENABLED
+      
+  EC2InstanceStop:
+    Type: 'AWS::Lambda::Function'
+    DependsOn:
+      - MyRole    
+    Properties:
+      FunctionName: !Ref EC2StopFunctionName
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt 
+        - MyRole
+        - Arn
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: lambda/ec2-stop.zip
+      Runtime: python2.7
+      MemorySize: 256
+      Timeout: 600
+      Description: EC2 Instance will stop daily based on Instance Tag with Schedule
+
+  EC2StopSchedule:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Name: !Ref EC2StopFunctionName
+      Description: EC2 Instance Will Stop at 05:00 GMT Everyday
+      ScheduleExpression: "cron(30 05 * * ? *)"
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "EC2InstanceStop"
+              - "Arn"
+          Id: !Ref EC2StartFunctionName
+      State: ENABLED
+
+Outputs:
+
+  EC2InstanceStart:
+    Description: Get the Lambda Function for RegisterAMI
+    Value: !Ref EC2InstanceStart
+
+  CloudWatchEC2StartSchedule:
+    Description: Get the Cloudwatch info 
+    Value: !Ref EC2StartSchedule
+    
+  EC2InstanceStop:
+    Description: Get the Lambda Function for DeregisterAMI
+    Value: !Ref EC2InstanceStop
+      
+  CloudWatchEC2StopSchedule:
+    Description: Get the Cloudwatch info 
+    Value: !Ref EC2StopSchedule
