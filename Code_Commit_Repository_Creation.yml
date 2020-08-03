@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  This CloudFormation script provisions a codecommit repo creation project .
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+  
+Parameters:
+
+  NewRepositoryName:
+    Type: String
+    Description: Repository Name
+    Default: example
+
+Resources:
+    
+  MyNewRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref NewRepositoryName
+      RepositoryDescription: New Repository Creation

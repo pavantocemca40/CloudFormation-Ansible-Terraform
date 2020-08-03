@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: >
+  AWS CloudFormation template to create a AWS-DMS Endpoint either Source or Target.
+  
+Parameters:
+  EndpointIdentifier:
+    Description: Enter the DMS Endpoint Identifier
+    Type: String
+    
+  EndpointType:
+    Type: String
+    Description: Enter Endpoint type. Either source or target.
+    AllowedValues:
+      - source
+      - target
+      
+  EngineName:
+    Type: String
+    Description: Select Endpoint Name.
+    AllowedValues:
+      - mysql
+      - oracle
+      - postgres
+      - mariadb
+      - aurora
+      - aurora-postgresql
+      - redshift
+      - s3
+      - db2
+      - azuredb
+      - sybase
+      - dynamodb
+      - mongodb
+      - sqlserver
+  
+  UserName:
+    Description: Enter the DMS user for the source/taget server
+    Type: String
+    
+  UserPassword:
+    Description: Enter the DMS user password for the source/target server
+    Type: String
+    
+  Port:
+    Description: Enter the port number of the DB
+    Type: String
+    
+  ServerHostName:
+    Description: Enter the host name details of the source/target DB server
+    Type: String
+    
+  DatabaseName:
+    Description: Enter the source SID/target database /Service info
+    Type: String
+    
+  EndPointExtraConnectionAttributes:
+    Description: Enter the additional connection attribute for source/taget endpoint
+    Type: String
+    
+Resources:
+
+  Endpoint:
+    Type: 'AWS::DMS::Endpoint'
+    Properties:
+      EndpointIdentifier: !Ref EndpointIdentifier
+      EndpointType: !Ref EndpointType
+      EngineName: !Ref EngineName
+      Username: !Ref DMSUserName
+      Password: !Ref UserPassword
+      Port: !Ref Port
+      ServerName: !Ref ServerHostName
+      DatabaseName: !Ref DatabaseName
+      ExtraConnectionAttributes: !Ref EndPointExtraConnectionAttributes
+      Tags: 
+        - 
+          Key: DMSEndpoint
+          Value: !Ref EndpointIdentifier    
+Outputs:
+
+  EndPointArn:
+    Value: !Ref Endpoint

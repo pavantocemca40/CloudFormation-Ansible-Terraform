@@ -1,0 +1,292 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  This template creates a cross account role for Minfy - MS Operations Account at client account
+
+Resources:
+
+  L1Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: 'MTMSOpsL1'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              AWS: !Join [ "", [ 'arn:aws:iam::' , '154386972623' , ':root' ] ]
+            Sid: ''
+            Condition:
+                    Bool:  
+                        aws:MultiFactorAuthPresent: true
+        Version: '2012-10-17'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:CreateTags'
+                  - 'ec2:DeleteTags'
+                  - 'ec2:RebootInstances'
+                  - 'ec2:StartInstances'
+                  - 'ec2:StopInstances'
+                  - 'ec2:CreateImage'
+                  - 'ec2:DeregisterImage'
+                  - 'ec2:ModifyImageAttribute'
+                  - 'ec2:DeleteSnapshot'
+                  - 'rds:AddTagsToResource'
+                  - 'rds:RemoveTagsFromResource'
+                  - 'rds:StartDBCluster'
+                  - 'rds:StopDBCluster'
+                  - 'rds:StartDBInstance'
+                  - 'rds:StopDBInstance'
+                  - 'rds:CreateDBClusterSnapshot'
+                  - 'rds:DeleteDBClusterSnapshot'
+                  - 'rds:CreateDBSnapshot'
+                  - 'rds:DeleteDBSnapshot'
+                Resource: '*'
+          PolicyName: MTMSOPSL1_Policy
+ 
+  L2Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: 'MTMSOpsL2'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              AWS: !Join [ "", [ 'arn:aws:iam::' , '154386972623' , ':root' ] ]
+            Sid: ''
+            Condition:
+                    Bool:  
+                        aws:MultiFactorAuthPresent: true
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+        - PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action: "*"
+              Resource: "*"
+            - Effect: Deny
+              Action:
+              - acm:DeleteCertificate
+              - apigateway:DELETE
+              - application-autoscaling:DeleteScalingPolicy
+              - application-autoscaling:DeleteScheduledAction
+              - autoscaling-plans:DeleteScalingPlan
+              - autoscaling:DeleteAutoScalingGroup
+              - autoscaling:DeleteLaunchConfiguration
+              - autoscaling:DeleteLifecycleHook
+              - autoscaling:DeleteNotificationConfiguration
+              - autoscaling:DeleteScheduledAction
+              - cloudformation:DeleteChangeSet
+              - cloudformation:DeleteStack
+              - cloudformation:DeleteStackInstances
+              - cloudformation:DeleteStackSet
+              - cloudfront:DeleteCloudFrontOriginAccessIdentity
+              - cloudfront:DeleteDistribution
+              - cloudfront:DeleteStreamingDistribution
+              - cloudtrail:DeleteTrail
+              - cloudwatch:DeleteAlarms
+              - cloudwatch:DeleteDashboards
+              - codecommit:DeleteBranch
+              - codecommit:DeleteCommentContent
+              - codecommit:DeleteFile
+              - codecommit:DeleteRepository
+              - cognito-sync:DeleteDataset
+              - cognito-sync:QueryRecords
+              - config:DeleteAggregationAuthorization
+              - config:DeleteConfigRule
+              - config:DeleteConfigurationAggregator
+              - config:DeleteConfigurationRecorder
+              - config:DeleteDeliveryChannel
+              - config:DeleteEvaluationResults
+              - config:DeletePendingAggregationRequest
+              - config:DeleteRetentionConfiguration
+              - dynamodb:DeleteItem
+              - dynamodb:DeleteTable
+              - ec2:DeleteCustomerGateway
+              - ec2:DeleteDhcpOptions
+              - ec2:DeleteEgressOnlyInternetGateway
+              - ec2:DeleteFleets
+              - ec2:DeleteFlowLogs
+              - ec2:DeleteFpgaImage
+              - ec2:DeleteInternetGateway
+              - ec2:DeleteKeyPair
+              - ec2:DeleteLaunchTemplate
+              - ec2:DeleteLaunchTemplateVersions
+              - ec2:DeleteNatGateway
+              - ec2:DeleteNetworkAcl
+              - ec2:DeleteNetworkAclEntry
+              - ec2:DeleteNetworkInterface
+              - ec2:DeleteNetworkInterfacePermission
+              - ec2:DeletePlacementGroup
+              - ec2:DeleteRoute
+              - ec2:DeleteRouteTable
+              - ec2:DeleteSecurityGroup
+              - ec2:DeleteSpotDatafeedSubscription
+              - ec2:DeleteSubnet
+              - ec2:DeleteVolume
+              - ec2:DeleteVpc
+              - ec2:DeleteVpcEndpointConnectionNotifications
+              - ec2:DeleteVpcEndpoints
+              - ec2:DeleteVpcEndpointServiceConfigurations
+              - ec2:DeleteVpcPeeringConnection
+              - ec2:DeleteVpnConnection
+              - ec2:DeleteVpnConnectionRoute
+              - ec2:DeleteVpnGateway
+              - ec2:TerminateInstances
+              - ec2messages:DeleteMessage
+              - elasticloadbalancing:DeleteListener
+              - elasticloadbalancing:DeleteLoadBalancer
+              - elasticloadbalancing:DeleteLoadBalancerListeners
+              - elasticloadbalancing:DeleteLoadBalancerPolicy
+              - elasticloadbalancing:DeleteRule
+              - elasticloadbalancing:DeleteTargetGroup
+              - elasticmapreduce:DeleteSecurityConfiguration
+              - es:DeleteElasticsearchDomain
+              - es:DeleteElasticsearchServiceRole
+              - events:DeleteRule
+              - events:DisableRule
+              - firehose:DeleteDeliveryStream
+              - kinesis:DeleteStream
+              - kinesisanalytics:DeleteApplication
+              - kinesisanalytics:DeleteApplicationOutput
+              - kinesisanalytics:DeleteApplicationReferenceDataSource
+              - kms:DeleteAlias
+              - kms:DeleteImportedKeyMaterial
+              - lambda:DeleteAlias
+              - lambda:DeleteEventSourceMapping
+              - lambda:DeleteFunction
+              - lambda:DeleteFunctionConcurrency
+              - logs:DeleteDestination
+              - logs:DeleteLogGroup
+              - logs:DeleteLogStream
+              - logs:DeleteMetricFilter
+              - logs:DeleteResourcePolicy
+              - logs:DeleteRetentionPolicy
+              - logs:DeleteSubscriptionFilter
+              - rds:DeleteDBCluster
+              - rds:DeleteDBClusterParameterGroup
+              - rds:DeleteDBClusterSnapshot
+              - rds:DeleteDBInstance
+              - rds:DeleteDBParameterGroup
+              - rds:DeleteDBSecurityGroup
+              - rds:DeleteDBSubnetGroup
+              - rds:DeleteEventSubscription
+              - rds:DeleteOptionGroup
+              - redshift:DeleteCluster
+              - redshift:DeleteClusterParameterGroup
+              - redshift:DeleteClusterSecurityGroup
+              - redshift:DeleteClusterSubnetGroup
+              - redshift:DeleteEventSubscription
+              - redshift:DeleteHsmClientCertificate
+              - redshift:DeleteHsmConfiguration
+              - redshift:DeleteSnapshotCopyGrant
+              - route53:DeleteHealthCheck
+              - route53:DeleteHostedZone
+              - route53:DeleteQueryLoggingConfig
+              - route53:DeleteReusableDelegationSet
+              - route53:DeleteTrafficPolicy
+              - route53:DeleteTrafficPolicyInstance
+              - route53:DeleteVPCAssociationAuthorization
+              - route53:DisassociateVPCFromHostedZone
+              - s3:DeleteBucket
+              - s3:DeleteBucketWebsite
+              - s3:DeleteObject
+              - s3:DeleteObjectTagging
+              - s3:DeleteObjectVersion
+              - s3:DeleteObjectVersionTagging
+              - ses:DeleteConfigurationSet
+              - ses:DeleteConfigurationSetEventDestination
+              - ses:DeleteConfigurationSetTrackingOptions
+              - ses:DeleteCustomVerificationEmailTemplate
+              - ses:DeleteIdentity
+              - ses:DeleteIdentityPolicy
+              - ses:DeleteReceiptFilter
+              - ses:DeleteReceiptRule
+              - ses:DeleteReceiptRuleSet
+              - ses:DeleteTemplate
+              - ses:DeleteVerifiedEmailAddress
+              - sns:DeleteEndpoint
+              - sns:DeletePlatformApplication
+              - sns:DeleteTopic
+              - sqs:DeleteMessage
+              - sqs:DeleteMessageBatch
+              - sqs:DeleteQueue
+              - waf-regional:DeleteByteMatchSet
+              - waf-regional:DeleteGeoMatchSet
+              - waf-regional:DeleteIPSet
+              - waf-regional:DeleteRateBasedRule
+              - waf-regional:DeleteRegexMatchSet
+              - waf-regional:DeleteRegexPatternSet
+              - waf-regional:DeleteRule
+              - waf-regional:DeleteRuleGroup
+              - waf-regional:DeleteSizeConstraintSet
+              - waf-regional:DeleteSqlInjectionMatchSet
+              - waf-regional:DeleteXssMatchSet
+              - waf:DeleteByteMatchSet
+              - waf:DeleteGeoMatchSet
+              - waf:DeleteIPSet
+              - waf:DeleteRateBasedRule
+              - waf:DeleteRegexMatchSet
+              - waf:DeleteRegexPatternSet
+              - waf:DeleteRule
+              - waf:DeleteRuleGroup
+              - waf:DeleteSizeConstraintSet
+              - waf:DeleteSqlInjectionMatchSet
+              - waf:DeleteXssMatchSet
+              Resource: "*"
+          PolicyName: MTMSOPSL2_Policy
+
+  L3Role:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: 'MTMSPWCL3'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              AWS: !Join [ "", [ 'arn:aws:iam::' , '154386972623' , ':root' ] ]
+            Sid: ''
+            Condition:
+                    Bool:  
+                        aws:MultiFactorAuthPresent: true
+        Version: '2012-10-17'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess        
+  PMORole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: 'MTMSPMO'
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              AWS: !Join [ "", [ 'arn:aws:iam::' , '154386972623' , ':root' ] ]
+            Sid: ''
+            Condition:
+                    Bool:  
+                        aws:MultiFactorAuthPresent: true
+        Version: '2012-10-17'
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+      Policies:
+        - PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'aws-portal:View*'
+                Resource: '*'
+          PolicyName: MTMSOPSPMO_Policy

@@ -1,0 +1,103 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  This CloudFormation script provisions a EC2 Instance launch.
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+
+Parameters:
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.0.0.0/16 
+
+  PublicSubnet1CIDR:
+    Description: >-
+      Please enter the IP range (CIDR notation) for the public subnet in the
+      first Availability Zone
+    Type: String
+    Default: 10.0.1.0/24
+    
+  MyKeyName:
+    Description: Select you keypair
+    Type: AWS::EC2::KeyPair::KeyName
+        
+  EnvironmentName:
+    Description: Select the Environment
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - uat
+      - prod
+
+Mappings:
+
+  MyRegionMap:
+    us-east-1:
+      HVM64: ami-0b69ea66ff7391e80
+    us-east-2:
+      HVM64: ami-00c03f7f7f2ec15c3
+    ap-south-1:
+      HVM64: ami-02913db388613c3e1
+
+  MyEnvironmentMap:
+    dev:
+      instanceType: t2.micro
+    uat:
+      instanceType: t2.small
+    prod:
+      instanceType: t2.medium
+
+Resources:
+  
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://codedeploybucketetechbrain.s3.ap-south-1.amazonaws.com/cfn/01.NestedStack-VPC-Wizard-One.yml
+      #TimeoutInMinutes: 5
+      Parameters:
+        VpcCIDR: !Ref VpcCIDR
+        PublicSubnet1CIDR: !Ref PublicSubnet1CIDR
+
+  SGStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://codedeploybucketetechbrain.s3.ap-south-1.amazonaws.com/cfn/03.NestedStack-SecuriyGroup.yml
+      #TimeoutInMinutes: 5
+      Parameters:
+        VpcCIDR: !GetAtt VPCStack.Outputs.VPC
+        
+  EC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !FindInMap
+        - MyRegionMap
+        - !Ref 'AWS::Region'
+        - HVM64
+      InstanceType: !FindInMap
+        - MyEnvironmentMap
+        - !Ref EnvironmentName
+        - instanceType
+      KeyName: !Ref MyKeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !GetAtt VPCStack.Outputs.PublicSubnet1
+          GroupSet:
+            - !GetAtt SGStack.Outputs.SGGroupId
+      UserData:
+        Fn::Base64: |
+          #!/bin/bash
+          sudo yum -y update
+          sudo yum -y erase java-1.7.0-openjdk.x86_64
+          sudo yum -y install java-1.8.0-openjdk.x86_64 java-1.8.0-openjdk-devel
+          sudo yum -y install tomcat8
+          sudo service tomcat8 start
+          sudo mkdir -p /usr/share/tomcat8/webapps/ROOT
+          sudo touch /usr/share/tomcat8/webapps/ROOT/index.html
+          sudo echo "Welcome to Etechbrain" > /usr/share/tomcat8/webapps/ROOT/index.html        
+Outputs:
+     
+  ApplicationURL:
+    Description: Application URL link
+    Value: !Sub 'http://${EC2Instance.PublicDnsName}:8080/index.html'

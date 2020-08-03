@@ -1,0 +1,38 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: |
+  VPC Wizard One Nested Stack template , It will create the Security Group.
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+  
+Parameters:
+
+  VpcCIDR:
+    Description: Create a SG in This VPC
+    Type: 'AWS::EC2::VPC::Id'
+    
+Resources:
+
+  SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Security Group Rules
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '443'
+          ToPort: '443'
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref VpcCIDR
+
+Outputs:
+
+  SGGroupId:
+    Description: Security Group Id
+    Value: !Ref SecurityGroup

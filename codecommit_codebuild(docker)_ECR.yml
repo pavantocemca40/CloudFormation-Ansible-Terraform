@@ -1,0 +1,136 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  This CloudFormation script provisions a CodeCommit,CodeBuild,ECR project .
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+  
+Parameters:
+
+  ECRRepositoryName:
+    Description: ECR repository name
+    Default: python
+    Type: String
+    
+  CodeCommitRepoName:
+    Type: String
+    Description: Repository Name to Create
+    Default: python
+    
+Resources:
+
+  CodeBuildRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName:
+        Fn::Sub: CodeBuildRole${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /service-role/
+      Policies:
+        - PolicyName: "CodeBuildAccessPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "codecommit:GitPull"
+                Resource:
+                  - Fn::Sub: arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CodeCommitRepoName}
+              - Effect: "Allow"
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreatelogStream"
+                  - "logs:PutLogEvents"
+                Resource:
+                  - Fn::Sub: arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
+              - Effect: Allow
+                Action:
+                  - 'ecr:*'
+                  - 'cloudtrail:LookupEvents'
+                Resource: '*'
+              - Action:
+                  - 'autoscaling:Describe*'
+                  - 'cloudwatch:*'
+                  - 'logs:*'
+                  - 'sns:*'
+                  - 'iam:GetPolicy'
+                  - 'iam:GetPolicyVersion'
+                  - 'iam:GetRole'
+                Effect: Allow
+                Resource: '*'
+              - Effect: Allow
+                Action: 'iam:CreateServiceLinkedRole'
+                Resource: >-
+                  arn:aws:iam::*:role/aws-service-role/events.amazonaws.com/AWSServiceRoleForCloudWatchEvents*
+                Condition:
+                  StringLike:
+                    'iam:AWSServiceName': events.amazonaws.com
+                    
+  CodeCommitRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref CodeCommitRepoName
+      RepositoryDescription: New Repository Creation
+      
+  ECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref ECRRepositoryName
+      Tags: 
+        - Key: Reponame
+          Value: !Sub ECRRepositoryName
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub BuildProject${AWS::StackName}
+      Description: Build Jar file from Welcome Application projcet
+      ServiceRole: !GetAtt [CodeBuildRole, Arn]
+      Artifacts:
+        Type: no_artifacts
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:1.0
+        PrivilegedMode: true
+      Source:
+        Location: !Sub https://git-codecommit.ap-south-1.amazonaws.com/v1/repos/${CodeCommitRepoName}
+        Type: CODECOMMIT
+      SourceVersion: 'refs/heads/master'
+      TimeoutInMinutes: 15
+      BadgeEnabled: false
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Sub "BuildProject${AWS::StackName}"
+          Status: ENABLED
+      Tags:
+        - Key: Name
+          Value: !Sub BuildProject${AWS::StackName}
+          
+Outputs:
+
+  MyECRRepository:
+    Description: CodeCommit repository
+    Value: !Ref ECRRepository
+    
+  MyECRRepositoryArn:
+    Description: Get the ECRRepository ARN
+    Value: !GetAtt  ECRRepository.Arn
+    
+  MyCodeCommitRepository:
+    Description: CodeCommit repository
+    Value: !Ref CodeCommitRepository
+    
+  MyCodecommitRepositoryArn:
+    Description: Get the ECRRepository ARN
+    Value: !GetAtt  CodeCommitRepository.Arn
+    
+  MyCodecommitRepositoryURL:
+    Description: Get the ECRRepository URL
+    Value: !GetAtt  CodeCommitRepository.CloneUrlHttp

@@ -1,0 +1,601 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Create a CodePipeline to include Nested CloudFormation, CodeBuild and Approval
+  steps.
+Parameters:
+
+  CFNTemplateRepoName:
+    Type: String
+    Default: codedeploybucketetechbrain
+    Description: Name of the repo which contains CFN template.
+    
+  DEVTopic:
+    Type: String
+    Default: Codecommit-Notification
+    Description: Name of the SNS topic in same region to send UAT approval notification.
+    
+  UATTopic:
+    Type: String
+    Default: Codecommit-Notification
+    Description: Name of the SNS topic in same region to send UAT approval notification.
+    
+  ProdTopic:
+    Type: String
+    Default: Codecommit-Notification
+    Description: >-
+      Name of the SNS topic in same region to send Production approval
+      notification.
+      
+  ArtifactStoreS3Location:
+    Type: String
+    Default: codedeploybucketetechbrain
+    Description: Bucket name will create Give a Unique Name & Name of the S3 bucket to store CodePipeline artificat.
+    
+Resources:
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Ref ArtifactStoreS3Location
+      
+  CodePipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName:
+        'Fn::Sub': 'CodePipelineRole-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: CodePipelineCFNAccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:DeleteObject'
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:ListBucket'
+                  - 's3:PutObject'
+                  - 's3:GetBucketPolicy'
+                Resource:
+                  - 'Fn::Sub': 'arn:aws:s3:::${ArtifactStoreS3Location}'
+                  - 'Fn::Sub': 'arn:aws:s3:::${ArtifactStoreS3Location}/*'
+              - Effect: Allow
+                Action:
+                  - 'sns:Publish'
+                Resource:
+                  - 'Fn::Sub': 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${UATTopic}'
+                  - 'Fn::Sub': 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ProdTopic}'
+              -
+                Effect: Allow
+                Action:
+                  - codecommit:CancelUploadArchive
+                  - codecommit:GetBranch
+                  - codecommit:GetCommit
+                  - codecommit:GetUploadArchiveStatus
+                  - codecommit:UploadArchive
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - codedeploy:CreateDeployment
+                  - codedeploy:GetApplicationRevision
+                  - codedeploy:GetDeployment
+                  - codedeploy:GetDeploymentConfig
+                  - codedeploy:RegisterApplicationRevision
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - devicefarm:ListProjects
+                  - devicefarm:ListDevicePools
+                  - devicefarm:GetRun
+                  - devicefarm:GetUpload
+                  - devicefarm:CreateUpload
+                  - devicefarm:ScheduleRun
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                  - lambda:ListFunctions
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: '*'
+              -
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:*
+                  - ec2:*
+                  - elasticloadbalancing:*
+                  - autoscaling:*
+                  - cloudwatch:*
+                  - s3:*
+                  - sns:*
+                  - cloudformation:*
+                  - rds:*
+                  - sqs:*
+                  - ecs:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource:
+                  - 'Fn::Sub': >-
+                      arn:aws:iam::${AWS::AccountId}:role/CloudFormationRole-${AWS::StackName}
+  CloudFormationRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName:
+        'Fn::Sub': 'CloudFormationRole-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: CloudFormationCFNAccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'iam:AddRoleToInstanceProfile'
+                  - 'iam:AttachRolePolicy'
+                  - 'iam:CreateInstanceProfile'
+                  - 'iam:CreatePolicy'
+                  - 'iam:CreateRole'
+                  - 'iam:DeleteInstanceProfile'
+                  - 'iam:DeletePolicy'
+                  - 'iam:DeleteRole'
+                  - 'iam:DeleteRolePolicy'
+                  - 'iam:DetachRolePolicy'
+                  - 'iam:GetInstanceProfile'
+                  - 'iam:GetPolicy'
+                  - 'iam:GetRole'
+                  - 'iam:GetRolePolicy'
+                  - 'iam:ListAttachedRolePolicies'
+                  - 'iam:ListInstanceProfiles'
+                  - 'iam:ListInstanceProfilesForRole'
+                  - 'iam:ListRolePolicies'
+                  - 'iam:ListRoles'
+                  - 'iam:PassRole'
+                  - 'iam:PutRolePolicy'
+                  - 'iam:RemoveRoleFromInstanceProfile'
+                Resource:
+                  - 'Fn::Sub': 'arn:aws:iam::${AWS::AccountId}:role/WebServerIAMRole-*'
+              - Effect: Allow
+                Action: 'ec2:*'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'iam:AddRoleToInstanceProfile'
+                  - 'iam:CreateInstanceProfile'
+                  - 'iam:DeleteInstanceProfile'
+                  - 'iam:GetInstanceProfile'
+                  - 'iam:ListInstanceProfiles'
+                  - 'iam:ListInstanceProfilesForRole'
+                  - 'iam:RemoveRoleFromInstanceProfile'
+                Resource:
+                  - 'Fn::Sub': >-
+                      arn:aws:iam::${AWS::AccountId}:instance-profile/DEV-${AWS::StackName}-SecurityStack*
+                  - 'Fn::Sub': >-
+                      arn:aws:iam::${AWS::AccountId}:instance-profile/UAT-${AWS::StackName}-SecurityStack*
+                  - 'Fn::Sub': >-
+                      arn:aws:iam::${AWS::AccountId}:instance-profile/PROD-${AWS::StackName}-SecurityStack*
+              - Effect: Allow
+                Action:
+                  - 'rds:AddTagsToResource'
+                  - 'rds:CreateDBInstance'
+                  - 'rds:CreateDBSecurityGroup'
+                  - 'rds:DeleteDBInstance'
+                  - 'rds:DeleteDBSecurityGroup'
+                  - 'rds:DescribeDBInstances'
+                  - 'rds:DescribeDBParameterGroups'
+                  - 'rds:DescribeDBParameters'
+                  - 'rds:DescribeDBSecurityGroups'
+                  - 'rds:DescribeDBSubnetGroups'
+                  - 'rds:DescribeOptionGroups'
+                  - 'rds:ModifyDBInstance'
+                  - 'rds:RebootDBInstance'
+                  - 'rds:RemoveTagsFromResource'
+                Resource:
+                  - 'Fn::Sub': 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:db:*'
+                  - 'Fn::Sub': 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:og:*'
+                  - 'Fn::Sub': 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:pg:*'
+                  - 'Fn::Sub': 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:secgrp:*'
+                  - 'Fn::Sub': 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:subgrp:*'
+              - Effect: Allow
+                Action:
+                  - 'elasticloadbalancing:AddTags'
+                  - 'elasticloadbalancing:ApplySecurityGroupsToLoadBalancer'
+                  - 'elasticloadbalancing:AttachLoadBalancerToSubnets'
+                  - 'elasticloadbalancing:ConfigureHealthCheck'
+                  - 'elasticloadbalancing:CreateListener'
+                  - 'elasticloadbalancing:CreateLoadBalancerListeners'
+                  - 'elasticloadbalancing:CreateLoadBalancerPolicy'
+                  - 'elasticloadbalancing:DeleteListener'
+                  - 'elasticloadbalancing:DeleteLoadBalancer'
+                  - 'elasticloadbalancing:DeleteLoadBalancerListeners'
+                  - 'elasticloadbalancing:DeleteLoadBalancerPolicy'
+                  - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer'
+                  - 'elasticloadbalancing:DetachLoadBalancerFromSubnets'
+                  - 'elasticloadbalancing:ModifyListener'
+                  - 'elasticloadbalancing:ModifyLoadBalancerAttributes'
+                  - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+                  - 'elasticloadbalancing:RemoveTags'
+                  - 'elasticloadbalancing:SetSecurityGroups'
+                  - 'elasticloadbalancing:SetSubnets'
+                  - 'elasticloadbalancing:SetLoadBalancerPoliciesOfListener'
+                  - 'elasticloadbalancing:EnableAvailabilityZonesForLoadBalancer'
+                  - 'elasticloadbalancing:DisableAvailabilityZonesForLoadBalancer'
+                Resource:
+                  - 'Fn::Sub': >-
+                      arn:aws:elasticloadbalancing:${AWS::Region}:${AWS::AccountId}:loadbalancer/WebELB-*
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:AttachInstances'
+                  - 'autoscaling:AttachLoadBalancers'
+                  - 'autoscaling:CreateOrUpdateTags'
+                  - 'autoscaling:DeleteAutoScalingGroup'
+                  - 'autoscaling:DeleteLaunchConfiguration'
+                  - 'autoscaling:DeleteTags'
+                  - 'autoscaling:SetDesiredCapacity'
+                  - 'autoscaling:SetInstanceHealth'
+                  - 'autoscaling:TerminateInstanceInAutoScalingGroup'
+                  - 'autoscaling:UpdateAutoScalingGroup'
+                Resource:
+                  - 'Fn::Sub': >-
+                      arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/DEV-${AWS::StackName}-ServerStack-*
+                  - 'Fn::Sub': >-
+                      arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/UAT-${AWS::StackName}-ServerStack-*
+                  - 'Fn::Sub': >-
+                      arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:autoScalingGroup:*:autoScalingGroupName/PROD-${AWS::StackName}-ServerStack-*
+                  - 'Fn::Sub': >-
+                      arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:launchConfiguration:${AWS::AccountId}:*:DEV-${AWS::StackName}-ServerStack-*
+                  - 'Fn::Sub': >-
+                      arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:launchConfiguration:${AWS::AccountId}:*:UAT-${AWS::StackName}-ServerStack-*
+                  - 'Fn::Sub': >-
+                      arn:aws:autoscaling:${AWS::Region}:${AWS::AccountId}:launchConfiguration:${AWS::AccountId}:*:PROD-${AWS::StackName}-ServerStack-*
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:ListBucket'
+                Resource:
+                  - 'Fn::Sub': 'arn:aws:s3:::${ArtifactStoreS3Location}'
+                  - 'Fn::Sub': 'arn:aws:s3:::${ArtifactStoreS3Location}/*'
+  CodeBuildRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName:
+        'Fn::Sub': 'CodeBuildRole-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: CodeBuildCFNAccessPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'cloudformation:Get*'
+                  - 'cloudformation:Describe*'
+                  - 'cloudformation:List*'
+                Resource:
+                  - 'Fn::Sub': >-
+                      arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/DEV-${AWS::StackName}*
+              - Effect: Allow
+                Action:
+                  - 'codecommit:ListBranches'
+                  - 'codecommit:ListRepositories'
+                  - 'codecommit:BatchGetRepositories'
+                  - 'codecommit:Get*'
+                  - 'codecommit:GitPull'
+                Resource:
+                  - 'Fn::Sub': >-
+                      arn:aws:codecommit:${AWS::Region}:${AWS::AccountId}:${CFNTemplateRepoName}
+              -
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:*
+                  - ec2:*
+                  - elasticloadbalancing:*
+                  - autoscaling:*
+                  - cloudwatch:*
+                  - s3:*
+                  - sns:*
+                  - cloudformation:*
+                  - rds:*
+                  - sqs:*
+                  - ecs:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - 'Fn::Sub': >-
+                      arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*
+              - Effect: Allow
+                Action:
+                  - 's3:PutObject'
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:ListBucket'
+                Resource:
+                  - 'Fn::Sub': 'arn:aws:s3:::codepipeline-${AWS::Region}-*'
+                  - 'Fn::Sub': 'arn:aws:s3:::${ArtifactStoreS3Location}/*'
+                  - 'Fn::Sub': 'arn:aws:s3:::${ArtifactStoreS3Location}'
+  CodeBuildProject:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Name:
+        'Fn::Sub': 'Build-CFN-${AWS::StackName}'
+      Description: Build to validate a CFN templates
+      ServiceRole:
+        'Fn::GetAtt':
+          - CodeBuildRole
+          - Arn
+      Artifacts:
+        Type: S3
+        Location:
+          Ref: ArtifactStoreS3Location
+        Name:
+          'Fn::Sub': 'Build-CFN-${AWS::StackName}'
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: 'aws/codebuild/standard:2.0'
+        EnvironmentVariables:
+          - Name: TEMPLATE_BUCKET
+            Value:
+              Ref: ArtifactStoreS3Location
+          - Name: TEMPLATE_PREFIX
+            Value: codebuild
+      Source:
+        Location:
+          'Fn::Sub': >-
+            https://git-codecommit.ap-south-1.amazonaws.com/v1/repos/${CFNTemplateRepoName}
+        Type: CODECOMMIT
+      TimeoutInMinutes: 15
+      #EncryptionKey:
+        #'Fn::Sub': 'arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3'
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Sub': 'Build-CFN-${AWS::StackName}'
+
+  DeployPipeline:
+    Type: "AWS::CodePipeline::Pipeline"
+    Properties:
+      Name:
+        Fn::Sub: ContinuousDeliveryNestedCFN-${AWS::StackName}
+      RoleArn:
+          Fn::GetAtt: [ CodePipelineRole, Arn ]
+      Stages:
+        -
+          Name: CFNSource
+          Actions:
+            -
+              Name: CFNTemplateSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              OutputArtifacts:
+                -
+                  Name: CFNTemplateOutput
+              Configuration:
+                BranchName: master
+                RepositoryName:
+                  Ref: CFNTemplateRepoName
+              RunOrder: 1
+        -
+          Name: CFNCodeBuild
+          Actions:
+            -
+              Name: CodeBuild
+              InputArtifacts:
+                - Name: CFNTemplateOutput
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              OutputArtifacts:
+                -
+                  Name: CFNTemplateArtifact
+              Configuration:
+                ProjectName:
+                  Ref: CodeBuildProject
+              RunOrder: 1
+            -
+              Name: CreateDevCFNStack
+              InputArtifacts:
+                -
+                  Name: CFNTemplateArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              OutputArtifacts:
+                -
+                  Name: CreatedDevCFNStack
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                RoleArn:
+                  Fn::GetAtt: [ CloudFormationRole, Arn ]
+                Capabilities: CAPABILITY_NAMED_IAM
+                StackName:
+                  Fn::Sub: DEV-${AWS::StackName}
+                TemplateConfiguration: CFNTemplateArtifact::config-dev.json
+                TemplatePath: CFNTemplateArtifact::vpc-dev.yml
+              RunOrder: 2
+        -
+          Name: UAT
+          Actions:
+            -
+              Name: CreateUATChangeSet
+              InputArtifacts:
+                -
+                  Name: CFNTemplateArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              OutputArtifacts:
+                -
+                  Name: CreatedUATChangeSet
+              Configuration:
+                ActionMode: CHANGE_SET_REPLACE
+                ChangeSetName: UATCBChangeSet
+                RoleArn:
+                  Fn::GetAtt: [ CloudFormationRole, Arn ]
+                Capabilities: CAPABILITY_NAMED_IAM
+                StackName:
+                  Fn::Sub: UAT-${AWS::StackName}
+                TemplateConfiguration: CFNTemplateArtifact::config-uat.json
+                TemplatePath: CFNTemplateArtifact::vpc-uat.yml
+              RunOrder: 1
+            -
+              Name: ExecuteUATChangeSet
+              InputArtifacts:
+                -
+                  Name: CreatedUATChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              OutputArtifacts:
+                -
+                  Name: DeployedUAT
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                ChangeSetName: UATCBChangeSet
+                StackName:
+                  Fn::Sub: UAT-${AWS::StackName}
+              RunOrder: 2
+            -
+              Name: UATApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
+              Configuration:
+                NotificationArn:
+                  Fn::Sub: arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${UATTopic}
+                CustomData: Approve once UAT has been completed.
+              RunOrder: 3
+        -
+          Name: Production
+          Actions:
+            -
+              Name: CreateProdChangeSet
+              InputArtifacts:
+                -
+                  Name: CFNTemplateArtifact
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              OutputArtifacts:
+                -
+                  Name: CreatedProdChangeSet
+              Configuration:
+                ActionMode: CHANGE_SET_REPLACE
+                ChangeSetName: ProdCBChangeSet
+                RoleArn:
+                  Fn::GetAtt: [ CloudFormationRole, Arn ]
+                Capabilities: CAPABILITY_NAMED_IAM
+                StackName:
+                  Fn::Sub: PROD-${AWS::StackName}
+                TemplateConfiguration: CFNTemplateArtifact::config-prod.json
+                TemplatePath: CFNTemplateArtifact::vpc-prod.yml
+              RunOrder: 1
+            -
+              Name: ProdApproval
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Version: 1
+                Provider: Manual
+              Configuration:
+                NotificationArn:
+                  Fn::Sub: arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ProdTopic}
+                CustomData: Approve deployment in production.
+              RunOrder: 2
+            -
+              Name: DeployProduction
+              InputArtifacts:
+                -
+                  Name: CreatedProdChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: 1
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                ChangeSetName: ProdCBChangeSet
+                StackName:
+                  Fn::Sub: PROD-${AWS::StackName}
+              RunOrder: 3
+
+      ArtifactStore:
+        Type: S3
+        Location:
+          Ref: ArtifactStoreS3Location
+Outputs:
+
+  S3BucketName:
+    Description: A reference to the created S3Bucket
+    Value: !Ref ArtifactStoreS3Location
+
+  TopicARN:
+    Description: ARN of newly created SNS Topic
+    Value: !Ref SNSTopic
+    
+  QueueName:
+    Description: Name of newly created SNS Topic
+    Value: !GetAtt 
+      - SNSTopic
+      - TopicName

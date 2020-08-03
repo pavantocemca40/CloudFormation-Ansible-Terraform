@@ -1,0 +1,7 @@
+{
+  "Parameters" : {
+    "EnvironmentName" : "ETECH-UAT",
+	"VpcCIDR" : "172.22.1.0/24",
+	"PublicSubnet1CIDR" : "172.22.1.0/26"
+	}
+}

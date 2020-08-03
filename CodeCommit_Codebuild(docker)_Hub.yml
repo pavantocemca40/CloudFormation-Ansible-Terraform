@@ -1,0 +1,18 @@
+---
+phases:
+  build:
+    commands:
+      - "echo Build started on `date`"
+      - "echo Building the Docker image..."
+      - "docker build -t singaravelanp/python:latest ."
+      - "docker tag singaravelanp/python:latest singaravelanp/python:latest"
+  post_build:
+    commands:
+      - "echo Build completed on `date`"
+      - "echo Pushing the Docker image..."
+      - "docker push singaravelanp/python:latest"
+  pre_build:
+    commands:
+      - "echo Logging in to Docker Hub..."
+      - "docker login --username=\"singaravelanp\" --password=\"password\""
+version: 0.1

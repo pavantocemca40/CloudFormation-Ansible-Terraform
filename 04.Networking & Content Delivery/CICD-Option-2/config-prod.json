@@ -1,0 +1,8 @@
+{
+  "Parameters" : {
+    "EnvironmentName" : "ETECH-PROD",
+	"VpcCIDR" : "172.23.1.0/24",
+	"PublicSubnet1CIDR" : "172.23.1.0/26",
+	"PrivateSubnet1CIDR" : "172.23.1.64/26"
+	}
+}

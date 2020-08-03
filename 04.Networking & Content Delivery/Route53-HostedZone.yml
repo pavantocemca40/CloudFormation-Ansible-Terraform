@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: |
+  This CloudFormation script provisions a Route53 HostedZone.
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+Parameters:
+
+  DomainName:
+    Type: String
+    Default: etechbrain.com
+    
+Resources:
+
+  MyHostedZone:
+    Type: 'AWS::Route53::HostedZone'
+    Properties:
+      HostedZoneConfig:
+        Comment: My hosted zone
+      Name: !Ref DomainName
