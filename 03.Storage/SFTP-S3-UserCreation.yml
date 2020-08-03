@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: |
+  This CloudFormation script provisions a SFTP User Creation.
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+
+Parameters:
+
+  SFTPUserName:
+    Description: Give a SFTP User Name
+    Type: String
+    Default: murali
+
+  HomeDirectory:
+    Description: Give a SFTP User Name
+    Type: String
+    Default: '/sftp-dev-sftpbucket-1krgcluw275tg/home/murali'
+
+  SFTPServerId:  
+    Description: SFTP Server Id
+    Type: String
+    Default: 's-5109d15ed246486a8'
+    
+
+  SFTPUserRoleArn:  
+    Description: SFTP Role Arn
+    Type: String
+    Default: 'arn:aws:iam::798022781730:role/SFTP-DEV-SFTPUserRole-BNDOS5I460BV'
+    
+Resources:
+
+  SFTPUser:
+    Type: AWS::Transfer::User
+    Properties:
+      ServerId: !Ref SFTPServerId
+      UserName: !Ref 'SFTPUserName'
+      HomeDirectory: !Ref 'HomeDirectory'
+      Policy: >
+          {
+            "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "AllowListingOfUserFolder",
+                            "Effect": "Allow",
+                            "Action": "s3:ListBucket",
+                            "Resource": "arn:aws:s3:::${transfer:HomeBucket}",
+                            "Condition": {
+                                "StringLike": {
+                                    "s3:prefix": [
+                                        "home/${transfer:UserName}/*",
+                                        "home/${transfer:UserName}"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "Sid": "HomeDirObjectAccess",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:PutObject",
+                                "s3:GetObject",
+                                "s3:GetObjectVersion",
+                                "s3:DeleteObject",
+                                "s3:DeleteObjectVersion"
+                            ],
+                            "Resource": "arn:aws:s3:::${transfer:HomeDirectory}*"
+                        }
+                    ]
+            }
+      Role: !Ref 'SFTPUserRoleArn'
+      SshPublicKeys:
+        - ssh-rsa AAAABPfiBSPy*********OoG1X singaravelan.p@minfytech.com
+      Tags:
+        - Key: Application
+          Value: !Ref SFTPUserName
+
+Outputs:
+
+  SFTPUser:
+    Description: A reference to the created S3Bucket
+    Value: !Ref SFTPUser

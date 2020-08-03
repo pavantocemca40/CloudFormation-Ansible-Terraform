@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  This CloudFormation script provisions a S3 Bucket Creation With Enable a Server Side Encryption.
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+
+Parameters:
+
+  S3BucketName:
+    Description: Give a S3 Bucket Unique name, No CAPS Letters
+    Type: String
+    Default: etechbrain-dev-db
+    
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketName: !Ref S3BucketName
+      
+Outputs:
+
+  S3BucketName:
+    Description: A reference to the created S3Bucket
+    Value: !Ref S3Bucket  

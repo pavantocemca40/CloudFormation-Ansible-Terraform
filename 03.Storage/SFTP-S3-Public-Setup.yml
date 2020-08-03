@@ -1,0 +1,195 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: |
+  This CloudFormation script provisions a S3 Bucket SFTP Server.
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+
+Parameters:
+
+  S3BucketName:
+    Description: Give a S3 Bucket Unique name, No CAPS Letters
+    Type: String
+    Default: sftp-etechbrain-dev-db
+
+  HostedZoneIdParam:
+    Type: String
+    Default: 'Z1OC4T4G4S06Y3'
+    Description: Hosted Zone ID
+    
+  SFTPHostnameParam:
+    Type: String
+    Default: 'sftp.etechbrain.com'
+    Description: Hostname for the SFTP Server
+    
+Resources:
+
+  SFTPBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+     BucketName: !Ref S3BucketName    
+     PublicAccessBlockConfiguration: 
+       BlockPublicAcls: true
+       BlockPublicPolicy: true
+       IgnorePublicAcls: true
+       RestrictPublicBuckets: true
+        
+  SFTPLogRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - transfer.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:*'
+                Resource: 'arn:aws:logs:*:*:*'
+
+  SFTPUserRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - transfer.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: S3FullAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListAllMyBuckets
+                  - s3:GetBucketLocation
+                Resource: "*"
+        - PolicyName: AllowListingOfUserFolder
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !GetAtt SFTPBucket.Arn
+        - PolicyName: HomeDirObjectAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:DeleteObject
+                  - s3:DeleteObjectVersion
+                Resource: !Sub "${SFTPBucket.Arn}/*"
+
+  SFTPServer:
+    Type: AWS::Transfer::Server
+    Properties:
+      EndpointType: PUBLIC
+      Tags:
+        - Key: Application
+          Value: !Ref S3BucketName
+
+  SFTPServerDNSCNAMERecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref SFTPHostnameParam
+      HostedZoneId: !Ref HostedZoneIdParam
+      Type: CNAME
+      Comment: SFTP Transfer custom hostname
+      TTL: 300
+      ResourceRecords:
+        - !Sub ${SFTPServer.ServerId}.server.transfer.${AWS::Region}.amazonaws.com
+
+  SFTPUser:
+    Type: AWS::Transfer::User
+    Properties:
+      ServerId: !GetAtt SFTPServer.ServerId
+      UserName: velan
+      HomeDirectory: !Sub "/${SFTPBucket}/home/velan"
+      Policy: >
+          {
+            "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "AllowListingOfUserFolder",
+                            "Effect": "Allow",
+                            "Action": "s3:ListBucket",
+                            "Resource": "arn:aws:s3:::${transfer:HomeBucket}",
+                            "Condition": {
+                                "StringLike": {
+                                    "s3:prefix": [
+                                        "home/${transfer:UserName}/*",
+                                        "home/${transfer:UserName}"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "Sid": "HomeDirObjectAccess",
+                            "Effect": "Allow",
+                            "Action": [
+                                "s3:PutObject",
+                                "s3:GetObject",
+                                "s3:GetObjectVersion",
+                                "s3:DeleteObject",
+                                "s3:DeleteObjectVersion"
+                            ],
+                            "Resource": "arn:aws:s3:::${transfer:HomeDirectory}*"
+                        }
+                    ]
+            }
+      Role: !GetAtt SFTPUserRole.Arn
+      SshPublicKeys:
+        - ssh-rsa AAAABPfiBSPy*********OoG1X singaravelan.p@minfytech.com
+      Tags:
+        - Key: Application
+          Value: velan
+          
+Outputs:
+
+  S3BucketName:
+    Description: A reference to the created S3Bucket
+    Value: !Ref SFTPBucket 
+    
+  TransferUserRoleArn:
+    Description: IAM role ARN granting users full SFTP access S3 transfer bucket.
+    Value: !GetAtt SFTPUserRole.Arn
+  
+  TransferUserRoleName:
+    Description: IAM role name granting users full SFTP access S3 transfer bucket.
+    Value: !Ref SFTPUserRole
+  
+  TransferBucketArn:
+    Description: ARN of the S3 Bucket that acts as the storage back-end for the AWS  Transfer for SFTP service. 
+    Value: !GetAtt SFTPBucket.Arn
+
+  TransferBucketName:
+    Description: Name of the S3 Bucket that acts as the storage back-end for the AWS  Transfer for SFTP service. 
+    Value: !Ref SFTPBucket
+  
+  TransferLogRoleArn:
+    Description: ARN of the IAM role that the Transfer for SFTP service assumes to log results to CloudWatch Logs. 
+    Value: !GetAtt SFTPLogRole.Arn
+  
+  SFTPUser:
+    Description: A reference to the created S3Bucket
+    Value: !Ref SFTPUser

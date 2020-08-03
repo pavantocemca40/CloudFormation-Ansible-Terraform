@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: |
+  This CloudFormation script provisions a S3 Bucket With Static Website.
+  This playbook Created by Singaravelan.P @ Minfy Technologies
+
+Parameters:
+
+  S3BucketName:
+    Description: Give a S3 Bucket Unique name, No CAPS Letters
+    Type: String
+    Default: etechbrain-dev-web
+    
+Resources:
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      BucketName: !Ref S3BucketName
+      MetricsConfigurations: 
+        - Id: EntireBucket
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+    DeletionPolicy: Retain
+    
+Outputs:
+
+  WebsiteURL:
+    Value: !GetAtt [S3Bucket, WebsiteURL]
+    Description: URL for website hosted on S3
+    
+  S3BucketSecureURL:
+    Value: !Join ['', ['https://', !GetAtt [S3Bucket, DomainName]]]
+    Description: Name of S3 bucket to hold website content
